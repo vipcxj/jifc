@@ -1,9 +1,7 @@
 package me.cxj.ifc.deserializer;
 
 import me.cxj.ifc.model.BasicIfcModel;
-import me.cxj.ifc.model.PackageMetaDataSet;
-import me.cxj.ifc.utils.GeomUtils;
-import me.cxj.ifc.utils.IOUtils;
+import me.cxj.ifc.model.IfcModel;
 import nl.tue.buildingsmart.schema.Attribute;
 import nl.tue.buildingsmart.schema.EntityDefinition;
 import nl.tue.buildingsmart.schema.ExplicitAttribute;
@@ -22,7 +20,10 @@ import org.eclipse.emf.ecore.*;
 import org.eclipse.emf.ecore.impl.EClassImpl;
 import org.eclipse.emf.ecore.impl.EEnumImpl;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -47,7 +48,7 @@ public class IfcStepDeserializer implements IfcDeserializer {
     private static final String WRAPPED_VALUE = "wrappedValue";
     private final WaitingList<Integer> waitingList = new WaitingList<>();
     private Mode mode = Mode.HEADER;
-    private IfcModelInterface model;
+    private IfcModel model;
     private int lineNumber;
     private PackageMetaData metaData;
 
@@ -68,13 +69,11 @@ public class IfcStepDeserializer implements IfcDeserializer {
     }
 
     @Override
-    public IfcModelInterface read(InputStream inputStream, ByteProgressReporter reporter) throws DeserializeException {
-        byte[] byteArray = IOUtils.toByteArray(inputStream, false);
-        int initialCapacity = byteArray.length / AVERAGE_LINE_LENGTH;
-        model = new BasicIfcModel(metaData, null, initialCapacity);
+    public IfcModel read(InputStream inputStream, ByteProgressReporter reporter) throws DeserializeException {
+        model = new BasicIfcModel(metaData, null);
         long bytesRead = 0;
         lineNumber = 0;
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(byteArray), StandardCharsets.UTF_8))){
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))){
             StringBuilder line = Optional.ofNullable(reader.readLine()).map(StringBuilder::new).orElse(null);
             if (line == null) {
                 throw new DeserializeException("Unexpected end of stream reading first line " + model);
@@ -111,7 +110,6 @@ public class IfcStepDeserializer implements IfcDeserializer {
             if (mode == Mode.HEADER) {
                 throw new DeserializeException(lineNumber, "No valid IFC header found");
             }
-            GeomUtils.generateGeomData(model, byteArray, getPackageMetaData() == PackageMetaDataSet.IFC4.getMetaData());
         } catch (IOException | NoSuchAlgorithmException e) {
             throw new DeserializeException(lineNumber, e);
         }

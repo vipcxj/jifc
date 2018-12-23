@@ -1,7 +1,7 @@
 package me.cxj.ifc.deserializer;
 
+import me.cxj.ifc.model.IfcModel;
 import me.cxj.ifc.utils.IOUtils;
-import org.bimserver.emf.IfcModelInterface;
 import org.bimserver.plugins.deserializers.ByteProgressReporter;
 import org.bimserver.plugins.deserializers.DeserializeException;
 import org.bimserver.utils.FakeClosingInputStream;
@@ -26,7 +26,7 @@ public class ZipWrapperDeserializer<D extends IfcDeserializer> implements IfcDes
     }
 
     @Override
-    public IfcModelInterface read(InputStream inputStream, ByteProgressReporter reporter) throws DeserializeException {
+    public IfcModel read(InputStream inputStream, ByteProgressReporter reporter) throws DeserializeException {
         BufferedInputStream bis = new BufferedInputStream(inputStream);
         bis.mark(4);
         byte[] magic = new byte[4];
@@ -39,9 +39,8 @@ public class ZipWrapperDeserializer<D extends IfcDeserializer> implements IfcDes
                 if (nextEntry == null) {
                     throw new DeserializeException("Zip files must contain exactly one IFC-file, this zip-file looks empty");
                 }
-                IfcModelInterface model;
                 FakeClosingInputStream fakeClosingInputStream = new FakeClosingInputStream(zipInputStream);
-                model = deserializer.read(fakeClosingInputStream, reporter);
+                IfcModel model = deserializer.read(fakeClosingInputStream, reporter);
                 if (model.size() == 0) {
                     throw new DeserializeException("Input file does not seem to be a correct IFC file");
                 }

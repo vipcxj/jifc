@@ -1,8 +1,8 @@
 package me.cxj.ifc.deserializer;
 
+import me.cxj.ifc.model.IfcModel;
 import me.cxj.ifc.model.PackageMetaDataSet;
 import me.cxj.ifc.utils.IOUtils;
-import org.bimserver.emf.IfcModelInterface;
 import org.bimserver.emf.PackageMetaData;
 import org.bimserver.emf.Schema;
 import org.bimserver.plugins.deserializers.ByteProgressReporter;
@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 public class IfcAutoDetectDeserializer implements IfcDeserializer {
 
     @Override
-    public IfcModelInterface read(InputStream inputStream, ByteProgressReporter reporter) throws DeserializeException {
+    public IfcModel read(InputStream inputStream, ByteProgressReporter reporter) throws DeserializeException {
         BufferedInputStream bis = new BufferedInputStream(inputStream);
         bis.mark(4096);
         byte[] buffer = new byte[4096];

@@ -1,6 +1,7 @@
 package me.cxj.ifc.utils;
 
 import me.cxj.ifc.ifc4.IfcGeomIterator;
+import me.cxj.ifc.model.PackageMetaDataSet;
 import org.bimserver.emf.IdEObject;
 import org.bimserver.emf.IfcModelInterface;
 import org.bimserver.emf.PackageMetaData;
@@ -12,24 +13,27 @@ import org.bytedeco.javacpp.*;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Created by vipcxj on 2018/12/10.
  */
 public class GeomUtils {
 
-    public static void generateGeomData(IfcModelInterface model, byte[] data, boolean ifc4) {
+    public static void generateGeomData(IfcModelInterface model, byte[] data) {
         GeometryFactory factory = GeometryFactory.eINSTANCE;
         try (PointerScope scope = new PointerScope()){
             int setting = IfcGeomIterator.DataIterator.EXCLUDE_SOLIDS_AND_SURFACES | IfcGeomIterator.DataIterator.WELD_VERTICES;
             double dt = 1e-4;
+            boolean ifc4 = model.getPackageMetaData() == PackageMetaDataSet.IFC4.getMetaData();
             if (ifc4) {
                 BytePointer pointer = IfcGeomIterator.allocateByteArray(data.length);
                 pointer.put(data);
                 IfcGeomIterator.DataIterator dataIterator = new IfcGeomIterator.DataIterator(setting, dt, pointer, data.length);
                 while (dataIterator.hasNext()) {
                     IfcGeomIterator.GeomData geomData = dataIterator.next();
-                    IdEObject idEObject = model.get(geomData.id());
+                    IdEObject idEObject = model.getByGuid(geomData.guid().getString("UTF-8"));
+                    assert idEObject != null;
                     if (idEObject instanceof IfcProduct) {
                         IfcProduct product = (IfcProduct) idEObject;
                         GeometryInfo geometryInfo = createGeometryInfo(model, geomData, factory);
@@ -42,7 +46,8 @@ public class GeomUtils {
                 me.cxj.ifc.ifc2x3.IfcGeomIterator.DataIterator dataIterator = new me.cxj.ifc.ifc2x3.IfcGeomIterator.DataIterator(setting, dt, pointer, data.length);
                 while (dataIterator.hasNext()) {
                     me.cxj.ifc.ifc2x3.IfcGeomIterator.GeomData geomData = dataIterator.next();
-                    IdEObject idEObject = model.get(geomData.id());
+                    IdEObject idEObject = model.getByGuid(geomData.guid().getString("UTF-8"));
+                    assert idEObject != null;
                     if (idEObject instanceof org.bimserver.models.ifc2x3tc1.IfcProduct) {
                         org.bimserver.models.ifc2x3tc1.IfcProduct product = (org.bimserver.models.ifc2x3tc1.IfcProduct) idEObject;
                         GeometryInfo geometryInfo = createGeometryInfo(model, geomData, factory);
@@ -50,15 +55,21 @@ public class GeomUtils {
                     }
                 }
             }
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException("This is impossible!", e);
         }
     }
 
-    private static Vector3f createVector3f(PackageMetaData packageMetaData, IfcModelInterface model, double defaultValue) {
+    public static Vector3f createVector3f(double x, double y, double z) {
         Vector3f vector3f = GeometryFactory.eINSTANCE.createVector3f();
-        vector3f.setX(defaultValue);
-        vector3f.setY(defaultValue);
-        vector3f.setZ(defaultValue);
+        vector3f.setX(x);
+        vector3f.setY(y);
+        vector3f.setZ(z);
         return vector3f;
+    }
+
+    public static Vector3f createVector3f(double defaultValue) {
+        return createVector3f(defaultValue, defaultValue, defaultValue);
     }
 
     private static Buffer createBuffer(IntPointer pointer, long size) {
@@ -156,15 +167,7 @@ public class GeomUtils {
             DoublePointer matrix
     ) {
         try {
-            boolean translate = true;
             GeometryInfo geometryInfo = factory.createGeometryInfo();
-
-            Bounds bounds = factory.createBounds();
-
-            bounds.setMin(createVector3f(model.getPackageMetaData(), model, Double.POSITIVE_INFINITY));
-            bounds.setMax(createVector3f(model.getPackageMetaData(), model, -Double.POSITIVE_INFINITY));
-
-            geometryInfo.setBounds(bounds);
             geometryInfo.setArea(area);
             if (volume < 0d) {
                 volume = -volume;
@@ -216,10 +219,16 @@ public class GeomUtils {
                 matrix.get(transformationMatrix);
             }
             transformationMatrix = Matrix.changeOrientation(transformationMatrix);
-            indices.position(0);
-            Vector3f[] extendsBound = initExtendsBound();
-            for (int i = 0; i < szIndices; i++) {
-                processExtends(geometryInfo, transformationMatrix, positions, indices.get(i) * 3, extendsBound);
+            if (szIndices > 0) {
+                Bounds bounds = factory.createBounds();
+                bounds.setMin(createVector3f(Double.POSITIVE_INFINITY));
+                bounds.setMax(createVector3f(-Double.POSITIVE_INFINITY));
+                geometryInfo.setBounds(bounds);
+                indices.position(0);
+                Vector3f[] extendsBound = initExtendsBound();
+                for (int i = 0; i < szIndices; i++) {
+                    processExtends(geometryInfo, transformationMatrix, positions, indices.get(i) * 3, extendsBound);
+                }
             }
             geometryInfo.setData(geometryData);
             ByteBuffer bfTransformationMatrix = ByteBuffer.allocate(16 * 8);

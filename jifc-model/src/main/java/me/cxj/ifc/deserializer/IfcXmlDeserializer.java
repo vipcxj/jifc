@@ -1,9 +1,7 @@
 package me.cxj.ifc.deserializer;
 
 import me.cxj.ifc.model.BasicIfcModel;
-import me.cxj.ifc.model.PackageMetaDataSet;
-import me.cxj.ifc.utils.GeomUtils;
-import me.cxj.ifc.utils.IOUtils;
+import me.cxj.ifc.model.IfcModel;
 import org.bimserver.emf.IdEObject;
 import org.bimserver.emf.IfcModelInterface;
 import org.bimserver.emf.IfcModelInterfaceException;
@@ -19,8 +17,6 @@ import javax.xml.datatype.DatatypeFactory;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
@@ -35,16 +31,14 @@ public class IfcXmlDeserializer implements IfcDeserializer {
         this.packageMetaData = metaData;
     }
 
-    public IfcModelInterface read(InputStream inputStream, ByteProgressReporter reporter) throws DeserializeException {
+    public IfcModel read(InputStream inputStream, ByteProgressReporter reporter) throws DeserializeException {
         XMLInputFactory inputFactory = XMLInputFactory.newInstance();
-        byte[] byteArray = IOUtils.toByteArray(inputStream, false);
-        try (InputStream is = new ByteArrayInputStream(byteArray)) {
-            XMLStreamReader reader = inputFactory.createXMLStreamReader(is, "UTF-8");
-            IfcModelInterface model = new BasicIfcModel(packageMetaData, null);
+        try {
+            XMLStreamReader reader = inputFactory.createXMLStreamReader(inputStream, "UTF-8");
+            IfcModel model = new BasicIfcModel(packageMetaData, null);
             parseDocument(model, reader);
-            GeomUtils.generateGeomData(model, byteArray, PackageMetaDataSet.IFC4.getMetaData() == packageMetaData);
             return model;
-        } catch (XMLStreamException | IOException e) {
+        } catch (XMLStreamException e) {
             throw new DeserializeException(e);
         }
     }
